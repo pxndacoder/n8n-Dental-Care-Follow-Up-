@@ -1,0 +1,1566 @@
+{
+  "name": "Dental Care Follow UP",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -16,
+        0
+      ],
+      "id": "4a4e238b-273b-47b2-89de-30d19a1b0126",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1oDrCvPfSJbq1etl4x-C-NWTkUC0c1Ley6oJJtKWaiPI/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Patients",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1oDrCvPfSJbq1etl4x-C-NWTkUC0c1Ley6oJJtKWaiPI/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        208,
+        0
+      ],
+      "id": "9bca8db4-85cf-445d-8cf2-6393af0854b0",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "BvtPTFRudX1mImjO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const FOLLOWUP_THRESHOLD_DAYS = 3;\nconst today = new Date();\n\nfunction daysBetween(date1, date2) {\n  const msPerDay = 1000 * 60 * 60 * 24;\n  return Math.floor((date1 - date2) / msPerDay);\n}\n\n// Normalize string (remove spaces, invisible chars)\nfunction normalize(str) {\n  return String(str || \"\")\n    .replace(/\\u2010|\\u2011|\\u2012|\\u2013|\\u2014|\\u2015/g, \"-\") // replace all weird dashes\n    .replace(/\\s|\\u00A0/g, \"\")\n    .toLowerCase();\n}\n\nconst results = [];\n\nfor (const item of items) {\n  const raw = item.json;\n\n  // Normalize key searching\n  const apptKey = Object.keys(raw).find((k) =>\n    normalize(k).includes(\"appointmentdate\")\n  );\n  const followUpKey = Object.keys(raw).find((k) =>\n    normalize(k).includes(\"followupsent\")\n  );\n\n  if (!apptKey) continue;\n\n  const apptDateStr = normalize(raw[apptKey]);\n  const apptDate = new Date(apptDateStr);\n  const followUpVal = normalize(raw[followUpKey]);\n\n  if (apptDate.toString() === \"Invalid Date\") continue; // skip malformed dates\n\n  const daysSince = daysBetween(today, apptDate);\n\n  if (daysSince > FOLLOWUP_THRESHOLD_DAYS && followUpVal !== \"yes\") {\n    results.push({ json: raw });\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "88c3a175-f61d-42cd-a5ae-dfc6ae63b803",
+      "name": "Code in JavaScript",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json[\"Treatment Details \"] }}",
+                    "rightValue": "/clean/i",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    },
+                    "id": "06704355-c3e6-4cf4-9879-f87473fba20f"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Cleaning"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "aaeec0de-bd7e-4c48-a02f-b68ede0b02ac",
+                    "leftValue": "={{ $json[\"Treatment Details \"] }}",
+                    "rightValue": "/surgical.?extract/i",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Surgical Extraction"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "877bf988-b381-4ee1-ba62-d9ec770ad7cd",
+                    "leftValue": "={{ $json[\"Treatment Details \"] }}",
+                    "rightValue": "/extract(?!.*surgical)/i",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Simple Extraction"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "3bf4137e-0251-48a9-ad79-3194cf67b075",
+                    "leftValue": "={{ $json[\"Treatment Details \"] }}",
+                    "rightValue": "/crown/i",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Crown"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "36bfd58c-3156-4f6e-9bde-70a0209e2bf5",
+                    "leftValue": "={{ $json[\"Treatment Details \"] }}",
+                    "rightValue": "/bridge/i",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Bridge"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4e3aab23-883e-4900-9027-2809fbee0a34",
+                    "leftValue": "={{ $json[\"Treatment Details \"] }}",
+                    "rightValue": "/denture/i",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Dentures"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "3b6a7db7-09f3-4bb2-aca2-8b9581ea1b2a",
+                    "leftValue": "={{ $json[\"Treatment Details \"] }}",
+                    "rightValue": "`/restoration",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Restorations"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "53a861f1-a17b-476f-96a7-cc26d33d0be9",
+                    "leftValue": "={{ $json[\"Treatment Details \"] }}",
+                    "rightValue": "`/post",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Post"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "aebb00e4-4614-4d72-940e-3b43b1dbc18d",
+                    "leftValue": "={{ $json[\"Treatment Details \"] }}",
+                    "rightValue": "`/srp",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "SRP"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e383509b-ce3c-4b32-955a-41a1b74d0c49",
+                    "leftValue": "={{ $json[\"Treatment Details \"] }}",
+                    "rightValue": "/sealant/i",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Sealant"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cac5a5bf-083f-4b88-a2e9-002df5cd7d31",
+                    "leftValue": "={{ $json[\"Treatment Details \"] }}",
+                    "rightValue": "/fluor/i",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Flouride"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        944,
+        -112
+      ],
+      "id": "787c6b15-4e4c-4479-857c-1076f46e835b",
+      "name": "Switch",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f9ac5fc1-b77c-4c0f-a152-75123464be59",
+              "name": "to",
+              "value": "={{$json[\"Email\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "e94c77ee-10ce-49ed-995b-83a61e3ad68f",
+              "name": "subject",
+              "value": "=Hope your teeth feel great, {{ $json[\" Name \"] }}!",
+              "type": "string"
+            },
+            {
+              "id": "5627e7b8-1bc1-4aed-982a-0c3f3b86d035",
+              "name": "body",
+              "value": "=Hi {{$json[\" Name \"]}},<br><br>\nThank you for visiting us on {{$json[\"Appointment Date \"]}} ...<br><br>\n✨ Tips after cleaning:<br>\n• Brush gently if your gums feel tender<br>\n• Floss daily<br>\n• Schedule your next visit in 6 months<br><br>\nWarm regards,<br>\nDr. Jada Browne<br>\n[Practice Name] Dental Care 🦷",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1408,
+        -768
+      ],
+      "id": "f33accbe-499b-4318-b406-9e2e999365cf",
+      "name": "Cleaning"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f9ac5fc1-b77c-4c0f-a152-75123464be59",
+              "name": "to",
+              "value": "={{$json[\"Email\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "e94c77ee-10ce-49ed-995b-83a61e3ad68f",
+              "name": "subject",
+              "value": "=Hope your teeth feel great, {{ $json[\" Name \"] }}!",
+              "type": "string"
+            },
+            {
+              "id": "5627e7b8-1bc1-4aed-982a-0c3f3b86d035",
+              "name": "body",
+              "value": "=Hi {{$json[\" Name \"]}},<br><br>\nWe hope you’re healing comfortably after your surgical extraction on {{$json[\"Appointment Date \"]}}.<br><br>\n✨ Care Tips:<br>\n• Bite gently on gauze for 30 minutes if you notice bleeding<br>\n• Stick to soft foods for the next 24 hours<br>\n• Avoid using a straw or smoking for two days<br>\n• Rinse very gently with warm salt water tomorrow<br><br>\nIf you notice swelling or persistent pain, please call our office right away.<br><br>\nWarmly,<br>\nDr. Jada Browne<br>\n[Practice Name] Dental Care 🦷",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1408,
+        -624
+      ],
+      "id": "1ed5467e-4770-492f-a813-ebd57ba7dff6",
+      "name": "Surgical Extraction"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f9ac5fc1-b77c-4c0f-a152-75123464be59",
+              "name": "to",
+              "value": "={{$json[\"Email\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "e94c77ee-10ce-49ed-995b-83a61e3ad68f",
+              "name": "subject",
+              "value": "=Hope your teeth feel great, {{ $json[\" Name \"] }}!",
+              "type": "string"
+            },
+            {
+              "id": "5627e7b8-1bc1-4aed-982a-0c3f3b86d035",
+              "name": "body",
+              "value": "=Hi {{$json[\" Name \"]}},<br><br>\nChecking in after your tooth extraction on {{$json[\"Appointment Date \"]}}.<br><br>\n✨ Care Tips:<br>\n• Keep gauze in place for 30 minutes to minimize bleeding<br>\n• Eat soft foods today; avoid hot, spicy, or crunchy items<br>\n• No straw, suction, or spitting for 24 hours<br>\n• Brush around the area gently starting tomorrow<br><br>\nContact us if pain or swelling increases.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1408,
+        -480
+      ],
+      "id": "25e15c52-2323-4ce8-b012-d3884a86992f",
+      "name": "Simple Extraction"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f9ac5fc1-b77c-4c0f-a152-75123464be59",
+              "name": "to",
+              "value": "={{$json[\"Email\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "e94c77ee-10ce-49ed-995b-83a61e3ad68f",
+              "name": "subject",
+              "value": "=Hope your teeth feel great, {{ $json[\" Name \"] }}!",
+              "type": "string"
+            },
+            {
+              "id": "5627e7b8-1bc1-4aed-982a-0c3f3b86d035",
+              "name": "body",
+              "value": "=Hi {{$json[\" Name \"]}},<br><br>\nHow’s your new crown from {{$json[\"Appointment Date \"]}} feeling?<br><br>\n✨ Care Tips:<br>\n• Slight sensitivity to temperature is normal for a few days<br>\n• Avoid very sticky or chewy foods for 24 hours<br>\n• Brush and floss gently around the crown<br>\n• If it feels high when you bite, let us know — we can adjust it quickly<br><br>\nWarm regards,<br>\nDr. Jada Browne<br>\n[Practice Name] Dental Care 🦷",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1408,
+        -336
+      ],
+      "id": "0fbea4a7-3934-4a77-ac55-a76d46868dae",
+      "name": "Crown"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f9ac5fc1-b77c-4c0f-a152-75123464be59",
+              "name": "to",
+              "value": "={{$json[\"Email\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "e94c77ee-10ce-49ed-995b-83a61e3ad68f",
+              "name": "subject",
+              "value": "=Hope your teeth feel great, {{ $json[\" Name \"] }}!",
+              "type": "string"
+            },
+            {
+              "id": "5627e7b8-1bc1-4aed-982a-0c3f3b86d035",
+              "name": "body",
+              "value": "=Hi {{$json[\" Name \"]}},<br><br>\nWe hope your new bridge placed on {{$json[\"Appointment Date \"]}} feels natural.<br><br>\n✨ Care Tips:<br>\n• Clean under the bridge daily with floss threaders or a water flosser<br>\n• Avoid extremely hard foods on that side for a few days<br>\n• Schedule regular check‑ups to keep the bridge and gum tissue healthy",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1408,
+        -192
+      ],
+      "id": "c47634d5-a146-4e4a-931f-ca686c922b35",
+      "name": "Bridge"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f9ac5fc1-b77c-4c0f-a152-75123464be59",
+              "name": "to",
+              "value": "={{$json[\"Email\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "e94c77ee-10ce-49ed-995b-83a61e3ad68f",
+              "name": "subject",
+              "value": "=Hope your teeth feel great, {{ $json[\" Name \"] }}!",
+              "type": "string"
+            },
+            {
+              "id": "5627e7b8-1bc1-4aed-982a-0c3f3b86d035",
+              "name": "body",
+              "value": "=Hi {{$json[\" Name \"]}},<br><br>\nWe’re checking in after your denture appointment on {{$json[\"Appointment Date \"]}}.<br><br>\n✨ Care Tips:<br>\n• Wear your dentures gradually for comfort<br>\n• Remove and rinse after eating<br>\n• Leave them out overnight in water or cleanser<br>\n• Let us know if sore spots develop — quick adjustments help a lot<br><br>\nWarm regards,<br>\nDr. Jada Browne<br>\n[Practice Name] Dental Care 🦷",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1408,
+        -48
+      ],
+      "id": "8f3d7402-9b3b-41a8-9cdc-3afdbefd7661",
+      "name": "Dentures"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f9ac5fc1-b77c-4c0f-a152-75123464be59",
+              "name": "to",
+              "value": "={{$json[\"Email\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "e94c77ee-10ce-49ed-995b-83a61e3ad68f",
+              "name": "subject",
+              "value": "=Hope your teeth feel great, {{ $json[\" Name \"] }}!",
+              "type": "string"
+            },
+            {
+              "id": "5627e7b8-1bc1-4aed-982a-0c3f3b86d035",
+              "name": "body",
+              "value": "=Hi {{$json[\" Name \"]}},<br><br>\nHope you’re doing well after your filling on {{$json[\"Appointment Date \"]}}.<br><br>\n✨ Care Tips:<br>\n• Mild sensitivity to pressure or temperature is normal for a few days<br>\n• Avoid chewing hard foods on that side today<br>\n• Brush and floss as usual to protect your new restoration",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1408,
+        112
+      ],
+      "id": "0a7b1b16-5dee-421c-8228-e474e732c23c",
+      "name": "Restorations"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f9ac5fc1-b77c-4c0f-a152-75123464be59",
+              "name": "to",
+              "value": "={{$json[\"Email\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "e94c77ee-10ce-49ed-995b-83a61e3ad68f",
+              "name": "subject",
+              "value": "=Hope your teeth feel great, {{ $json[\" Name \"] }}!",
+              "type": "string"
+            },
+            {
+              "id": "5627e7b8-1bc1-4aed-982a-0c3f3b86d035",
+              "name": "body",
+              "value": "=Hi {{$json[\" Name \"]}},<br><br>\nJust touching base after your post and core build‑up on {{$json[\"Appointment Date \"]}}.<br><br>\n✨ Care Tips:<br>\n• Avoid biting hard foods until your final crown is placed<br>\n• Keep the area clean and floss carefully<br>\n• Minor sensitivity or tightness should subside in a few days<br><br>\nWarm regards,<br>\nDr. Jada Browne",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1408,
+        272
+      ],
+      "id": "4e0ac74b-d3b6-42d2-92cc-60d7fb40fc7b",
+      "name": "Post"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f9ac5fc1-b77c-4c0f-a152-75123464be59",
+              "name": "to",
+              "value": "={{$json[\"Email\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "e94c77ee-10ce-49ed-995b-83a61e3ad68f",
+              "name": "subject",
+              "value": "=Hope your teeth feel great, {{ $json[\" Name \"] }}!",
+              "type": "string"
+            },
+            {
+              "id": "5627e7b8-1bc1-4aed-982a-0c3f3b86d035",
+              "name": "body",
+              "value": "=Hi {{$json[\" Name \"]}},<br><br>\nWe hope your gums are feeling better after your deep cleaning on {{$json[\"Appointment Date \"]}}.<br><br>\n✨ Care Tips:<br>\n• Rinse with warm salt water twice daily for two days<br>\n• A little tenderness is normal<br>\n• Continue gentle brushing and flossing<br>\n• Keep your regular maintenance visits to maintain gum health",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1408,
+        400
+      ],
+      "id": "8977c12a-6a53-4663-be32-80d716806437",
+      "name": "SRP"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f9ac5fc1-b77c-4c0f-a152-75123464be59",
+              "name": "to",
+              "value": "={{$json[\"Email\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "e94c77ee-10ce-49ed-995b-83a61e3ad68f",
+              "name": "subject",
+              "value": "=Hope your teeth feel great, {{ $json[\" Name \"] }}!",
+              "type": "string"
+            },
+            {
+              "id": "5627e7b8-1bc1-4aed-982a-0c3f3b86d035",
+              "name": "body",
+              "value": "=Hi {{$json[\" Name \"]}},<br><br>\nThank you for visiting for your sealants on {{$json[\"Appointment Date \"]}}.<br><br>\n✨ Care Tips:<br>\n• Avoid sticky candy today<br>\n• Resume normal diet and brushing tomorrow<br>\n• We’ll check your sealants at your next visit to ensure they’re intact",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1408,
+        560
+      ],
+      "id": "14d0100a-7290-41d0-8340-ddc912f1f38c",
+      "name": "Sealant"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f9ac5fc1-b77c-4c0f-a152-75123464be59",
+              "name": "to",
+              "value": "={{$json[\"Email\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "e94c77ee-10ce-49ed-995b-83a61e3ad68f",
+              "name": "subject",
+              "value": "=Hope your teeth feel great, {{ $json[\" Name \"] }}!",
+              "type": "string"
+            },
+            {
+              "id": "5627e7b8-1bc1-4aed-982a-0c3f3b86d035",
+              "name": "body",
+              "value": "=Hi {{$json[\" Name \"]}},<br><br>\nYour fluoride treatment on {{$json[\"Appointment Date \"]}} strengthens enamel and helps prevent cavities.<br><br>\n✨ Care Tips:<br>\n• Avoid eating, drinking, or rinsing for 30 minutes<br>\n• Brush twice a day with fluoride toothpaste<br>\n• Keep up regular checkups for long‑term protection",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1408,
+        736
+      ],
+      "id": "714e4277-3809-4b94-a212-c8323d0c5c49",
+      "name": "Flouride"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f9ac5fc1-b77c-4c0f-a152-75123464be59",
+              "name": "to",
+              "value": "={{$json[\"Email\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "e94c77ee-10ce-49ed-995b-83a61e3ad68f",
+              "name": "subject",
+              "value": "=Hope your teeth feel great, {{ $json[\" Name \"] }}!",
+              "type": "string"
+            },
+            {
+              "id": "5627e7b8-1bc1-4aed-982a-0c3f3b86d035",
+              "name": "body",
+              "value": "=Hi {{$json[\" Name \"]}},<br><br>\nThanks for visiting us on {{$json[\"Appointment Date \"]}}! We hope you’re healing well.<br><br>\nIf you have any questions about your treatment, don’t hesitate to reach out — we’re always here for you.<br><br>\nKind regards,<br>\nDr. Jada Browne<br>\n[Practice Name] Dental Care 🦷",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1408,
+        896
+      ],
+      "id": "8f40b6c6-6b2b-41aa-b23f-8fa720f252c8",
+      "name": "Default/Unlisted"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1808,
+        -1008
+      ],
+      "id": "dd5d2ad0-cae4-4918-b476-23412140d026",
+      "name": "Cleaning Send",
+      "webhookId": "bed56fb8-18c1-4dc4-9159-4c4897c2ffe1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "w5r0qR6FLUeAGI40",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1808,
+        -816
+      ],
+      "id": "48fb2303-dcf7-46fb-8d0a-130d1fe76453",
+      "name": "Surgical Extraction Send",
+      "webhookId": "bed56fb8-18c1-4dc4-9159-4c4897c2ffe1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "w5r0qR6FLUeAGI40",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1808,
+        -640
+      ],
+      "id": "9e8223bd-9d90-49a3-91e6-b8b7564d0c28",
+      "name": "Simple Extraction Send",
+      "webhookId": "bed56fb8-18c1-4dc4-9159-4c4897c2ffe1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "w5r0qR6FLUeAGI40",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1808,
+        -448
+      ],
+      "id": "7f500fe2-c889-4255-ad93-e3f0c939721a",
+      "name": "Crown Send",
+      "webhookId": "bed56fb8-18c1-4dc4-9159-4c4897c2ffe1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "w5r0qR6FLUeAGI40",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1792,
+        -256
+      ],
+      "id": "46a1f2f8-1f54-40ab-86c1-c9d6750f1084",
+      "name": "Bridge Send",
+      "webhookId": "bed56fb8-18c1-4dc4-9159-4c4897c2ffe1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "w5r0qR6FLUeAGI40",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1808,
+        -80
+      ],
+      "id": "c5df699b-6787-488e-90f7-bfc1134356bc",
+      "name": "Dentures Send",
+      "webhookId": "bed56fb8-18c1-4dc4-9159-4c4897c2ffe1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "w5r0qR6FLUeAGI40",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1808,
+        80
+      ],
+      "id": "a9d824db-3e30-42f7-9755-a4f2b088144c",
+      "name": "Restorations Send",
+      "webhookId": "bed56fb8-18c1-4dc4-9159-4c4897c2ffe1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "w5r0qR6FLUeAGI40",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1824,
+        240
+      ],
+      "id": "805a7ebb-9a24-4624-b889-2c768c61e615",
+      "name": "Post Send",
+      "webhookId": "bed56fb8-18c1-4dc4-9159-4c4897c2ffe1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "w5r0qR6FLUeAGI40",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1824,
+        400
+      ],
+      "id": "5d759204-53c4-47ca-8450-1ca291710033",
+      "name": "SRP Send",
+      "webhookId": "bed56fb8-18c1-4dc4-9159-4c4897c2ffe1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "w5r0qR6FLUeAGI40",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1824,
+        560
+      ],
+      "id": "bed0b236-187f-4a01-b44f-8d15f3cf12fd",
+      "name": "Sealant Send",
+      "webhookId": "bed56fb8-18c1-4dc4-9159-4c4897c2ffe1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "w5r0qR6FLUeAGI40",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1792,
+        752
+      ],
+      "id": "2275b3a1-0c2c-4bef-a884-1a6b67aa74e8",
+      "name": "Flouride Send",
+      "webhookId": "bed56fb8-18c1-4dc4-9159-4c4897c2ffe1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "w5r0qR6FLUeAGI40",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1792,
+        912
+      ],
+      "id": "ba1644af-67df-49a3-bfd6-a76d39673f42",
+      "name": "Default Send",
+      "webhookId": "bed56fb8-18c1-4dc4-9159-4c4897c2ffe1",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "w5r0qR6FLUeAGI40",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1oDrCvPfSJbq1etl4x-C-NWTkUC0c1Ley6oJJtKWaiPI",
+          "mode": "list",
+          "cachedResultName": "Dental Follow‑Up Tracker",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1oDrCvPfSJbq1etl4x-C-NWTkUC0c1Ley6oJJtKWaiPI/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Patients",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1oDrCvPfSJbq1etl4x-C-NWTkUC0c1Ley6oJJtKWaiPI/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Email": "={{ $('Switch').item.json.Email }}",
+            "FollowUp Sent? ": "Yes",
+            "Sent Date": "={{$now}}"
+          },
+          "matchingColumns": [
+            "Email"
+          ],
+          "schema": [
+            {
+              "id": " Name ",
+              "displayName": " Name ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Appointment Date ",
+              "displayName": "Appointment Date ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Treatment Details ",
+              "displayName": "Treatment Details ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "FollowUp Sent? ",
+              "displayName": "FollowUp Sent? ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Sent Date",
+              "displayName": "Sent Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2784,
+        96
+      ],
+      "id": "e9308c66-1aa1-4863-b7f4-caa2498be59f",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "BvtPTFRudX1mImjO",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Cleaning",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Surgical Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Simple Extraction",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Crown",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Bridge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Dentures",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Restorations",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SRP",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sealant",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Flouride",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Default/Unlisted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cleaning": {
+      "main": [
+        [
+          {
+            "node": "Cleaning Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Surgical Extraction": {
+      "main": [
+        [
+          {
+            "node": "Surgical Extraction Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Extraction": {
+      "main": [
+        [
+          {
+            "node": "Simple Extraction Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crown": {
+      "main": [
+        [
+          {
+            "node": "Crown Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bridge": {
+      "main": [
+        [
+          {
+            "node": "Bridge Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dentures": {
+      "main": [
+        [
+          {
+            "node": "Dentures Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restorations": {
+      "main": [
+        [
+          {
+            "node": "Restorations Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post": {
+      "main": [
+        [
+          {
+            "node": "Post Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SRP": {
+      "main": [
+        [
+          {
+            "node": "SRP Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sealant": {
+      "main": [
+        [
+          {
+            "node": "Sealant Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flouride": {
+      "main": [
+        [
+          {
+            "node": "Flouride Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default/Unlisted": {
+      "main": [
+        [
+          {
+            "node": "Default Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flouride Send": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Send": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sealant Send": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SRP Send": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Send": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restorations Send": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dentures Send": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bridge Send": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crown Send": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Extraction Send": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Surgical Extraction Send": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cleaning Send": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "20bc027c-c59d-4ac7-996e-517c58f70624",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1ddd3e595b5533f253d7c19754edcfecf7f075aabc9af679d9ea1d5853b29d16"
+  },
+  "id": "umfMYHXqc3IFk8Ji",
+  "tags": []
+}
